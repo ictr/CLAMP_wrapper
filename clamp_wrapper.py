@@ -6,8 +6,6 @@ import os
 import shlex
 import subprocess
 import sys
-import tempfile
-import shutil
 from pprint import pprint
 
 import numpy as np
@@ -16,6 +14,7 @@ import pandas as pd
 logging.basicConfig(level=logging.DEBUG)
 
 logger = logging.getLogger()
+
 
 def read_data(source, id_field):
     if not os.path.isfile(source):
@@ -119,6 +118,7 @@ def get_record(source_data, range, search, reg_search, is_empty, limit,
         logger.info(f'Limiting to first {limit} records')
     return data
 
+
 def execute_process(data, field, clamp_jar_file, clamp_license_file,
                  clamp_pipeline, umls_api_key,
                  umls_index_dir, semantics, id_field, input_dir, output_dir):
@@ -186,15 +186,18 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
                     logger.warning(f'{output_file}: {n_semantics} semantic identified. {n_recorded} recorded, {", ".join(ignored_semantics) if ignored_semantics else "none"} ignored.')
         return res
 
+
 def process_data(data, field, clamp_jar_file, clamp_license_file,
                  clamp_pipeline, clamp_project_dir, umls_api_key,
                  umls_index_dir, semantics, id_field):
     if not clamp_project_dir:
+
         with tempfile.TemporaryDirectory() as input_dir:
             with tempfile.TemporaryDirectory() as output_dir:
                 return execute_process(data, field, clamp_jar_file, clamp_license_file,
                         clamp_pipeline, umls_api_key,
                         umls_index_dir, semantics, id_field, input_dir, output_dir)
+
     if clamp_project_dir:
         if not semantics:
                 raise ValueError(
@@ -261,7 +264,7 @@ def write_results(output_file, data, results, same_file, id_field):
                 logger.info(f'Adding column {key} to {output_file}')
                 data.insert(2, key, [None for x in data[id_field]])
             #
-            data.iloc[idx, data.columns.get_loc(key)] = res[key]
+            data.iloc[idx, key] = res[key]
 
     if same_file:
         logger.info(f'Updating original input file {output_file}')
