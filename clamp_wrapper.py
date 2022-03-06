@@ -46,7 +46,7 @@ def get_record(source_data, range, search, reg_search, is_empty, limit,
         else:
             values = data[id_field].str.extract(
                 '(\d+)', expand=False).astype(int)
-            data[(values >= range[0]) & (values <= range[1])]
+            data = data[(values >= range[0]) & (values <= range[1])]
         logger.info(
             f'{data.shape[0]} records kept after restricting data from row {range[0]} to {range[1]}.'
         )
@@ -119,114 +119,91 @@ def get_record(source_data, range, search, reg_search, is_empty, limit,
     return data
 
 
-def execute_process(data, field, clamp_jar_file, clamp_license_file,
-                 clamp_pipeline, umls_api_key,
-                 umls_index_dir, semantics, id_field, input_dir, output_dir):
-        # write new files over
-        for _, row in data.iterrows():
-            input_file = os.path.join(input_dir, f"data_{row[id_field]}.txt")
-            logger.info(f'Exporting to {input_file}')
-            with open(input_file, 'w') as ifile:
-                ifile.write(row[field])
-        #
-        # CLAMP command
-        if not umls_api_key:
-            raise ValueError(
-                'Please specify your UMLS api key with option --umls-api-key')
-        if not clamp_pipeline:
-            raise ValueError(
-                'Please specify a pipeline (a .jar file) with option --clamp-pipeline'
-            )
-        if not os.path.isdir(umls_index_dir):
-            raise ValueError(
-                f'UMLS index directory {umls_index_dir} does not exist.')
-        cmd = [
-            'java', f'-DCLAMPLicenceFile={clamp_license_file}', '-Xmx3g', '-cp',
-            clamp_jar_file, 'edu.uth.clamp.nlp.main.PipelineMain', '-i', input_dir,
-            '-o', output_dir, '-p', clamp_pipeline, '-A', umls_api_key, '-I',
-            umls_index_dir
-        ]   
-        #
-        logging.info(" ".join(cmd))
-        subprocess.call(cmd)
-        res = {}
-        for _, row in data.iterrows():
-            output_file = os.path.join(output_dir, f"data_{row[id_field]}.txt")
-            if not os.path.exists(output_file):
-                raise RuntimeError(f'Failed to locate output file {output_file}')
-            # process output file
-            res[row[id_field]] = {x: 0 for x in semantics}
-            with open(output_file) as ofile:
-                n_semantics = 0
-                n_recorded = 0
-                ignored_semantics = set()
-                for line in ofile:
-                    # find lines such as
-                    # NamedEntity	496	514	semantic=problem	assertion=present	cui=C2939420	ne=metastatic disease
-                    #
-                    if not line.startswith('NamedEntity'):
-                        continue
-                    n_semantics += 1
-                    fields = line.split()
-                    if not fields[3].startswith(
-                            'semantic=') or not fields[4].startswith('assertion='):
-                        logger.warning(
-                            f'Unrecognizable output: {line.strip()}'
-                        )
-                        continue
-                    val = fields[3][9:] + '=' + fields[4][10:]
-                    if val in semantics:
-                        res[row[id_field]][val] += 1
-                        n_recorded += 1
-                    else:
-                        ignored_semantics.add(val)
-                if n_semantics == 0:
-                    logger.info(f'{output_file}: {n_semantics} semantic identified. {n_recorded} recorded, {", ".join(ignored_semantics) if ignored_semantics else "none"} ignored.')
-                else:
-                    logger.warning(f'{output_file}: {n_semantics} semantic identified. {n_recorded} recorded, {", ".join(ignored_semantics) if ignored_semantics else "none"} ignored.')
-        return res
-
-
 def process_data(data, field, clamp_jar_file, clamp_license_file,
                  clamp_pipeline, clamp_project_dir, umls_api_key,
                  umls_index_dir, semantics, id_field):
     if not clamp_project_dir:
-
-        with tempfile.TemporaryDirectory() as input_dir:
-            with tempfile.TemporaryDirectory() as output_dir:
-                return execute_process(data, field, clamp_jar_file, clamp_license_file,
-                        clamp_pipeline, umls_api_key,
-                        umls_index_dir, semantics, id_field, input_dir, output_dir)
-
-    if clamp_project_dir:
-        if not semantics:
-                raise ValueError(
-                'Please specify at least one semantics in the format of SEMANTIC=ASSERTION using parameter --semantics'
+        clamp_project_dir = '.'
+    if not semantics:
+        raise ValueError(
+            'Please specify at least one semantics in the format of SEMANTIC=ASSERTION using parameter --semantics'
+        )
+    input_dir = os.path.join(
+        os.path.expanduser(clamp_project_dir), 'Data', 'Input')
+    output_dir = os.path.join(
+        os.path.expanduser(clamp_project_dir), 'Data', 'Output')
+    if not os.path.isdir(input_dir) or not os.path.isdir(output_dir):
+        input_dir = os.path.join(os.path.expanduser(clamp_project_dir), 'input')
+        if not os.path.isdir(input_dir):
+            raise RuntimeError(
+                f'Input directory Data/Input or input does not exist under {clamp_project_dir}.'
             )
-        input_dir = os.path.join(
-            os.path.expanduser(clamp_project_dir), 'Data', 'Input')
         output_dir = os.path.join(
-            os.path.expanduser(clamp_project_dir), 'Data', 'Output')
-        if not os.path.isdir(input_dir) or not os.path.isdir(output_dir):
-            input_dir = os.path.join(os.path.expanduser(clamp_project_dir), 'input')
-            if not os.path.isdir(input_dir):
-                raise RuntimeError(
-                    f'Input directory Data/Input or input does not exist under {clamp_project_dir}.'
+            os.path.expanduser(clamp_project_dir), 'output')
+        if not os.path.isdir(output_dir):
+            raise RuntimeError(
+                f'Ounput directory Data/Output or output does not exist under {clamp_project_dir}.'
             )
-            output_dir = os.path.join(
-                os.path.expanduser(clamp_project_dir), 'output')
-            if not os.path.isdir(output_dir):
-                raise RuntimeError(
-                    f'Output directory Data/Output or output does not exist under {clamp_project_dir}.'
-            )
-        # clear data
-        for file in os.scandir(input_dir):
-            os.remove(file.path)
-        for file in os.scandir(output_dir):
-            os.remove(file.path)
-            return execute_process(data, field, clamp_jar_file, clamp_license_file,
-                    clamp_pipeline, umls_api_key,
-                    umls_index_dir, semantics, id_field, input_dir, output_dir)
+    # clear data
+    for file in os.scandir(input_dir):
+        os.remove(file.path)
+    for file in os.scandir(output_dir):
+        os.remove(file.path)
+    # write new files over
+    for _, row in data.iterrows():
+        input_file = os.path.join(input_dir, f"data_{row[id_field]}.txt")
+        logger.info(f'Exporting to {input_file}')
+        with open(input_file, 'w') as ifile:
+            ifile.write(row[field])
+    #
+    # CLAMP command
+    if not umls_api_key:
+        raise ValueError(
+            'Please specify your UMLS api key with option --umls-api-key')
+    if not clamp_pipeline:
+        raise ValueError(
+            'Please specify a pipeline (a .jar file) with option --clamp-pipeline'
+        )
+    if not os.path.isdir(umls_index_dir):
+        raise ValueError(
+            f'UMLS index directory {umls_index_dir} does not exist.')
+    cmd = [
+        'java', f'-DCLAMPLicenceFile={clamp_license_file}', '-Xmx3g', '-cp',
+        clamp_jar_file, 'edu.uth.clamp.nlp.main.PipelineMain', '-i', input_dir,
+        '-o', output_dir, '-p', clamp_pipeline, '-A', umls_api_key, '-I',
+        umls_index_dir
+    ]
+    #
+    logging.info(" ".join(cmd))
+    subprocess.call(cmd)
+    res = {}
+    for _, row in data.iterrows():
+        output_file = os.path.join(output_dir, f"data_{row[id_field]}.txt")
+        if not os.path.exists(output_file):
+            raise RuntimeError(f'Failed to locate output file {output_file}')
+        # process output file
+        res[row[id_field]] = {x: 0 for x in semantics}
+        with open(output_file) as ofile:
+            for line in ofile:
+                # find lines such as
+                # NamedEntity	496	514	semantic=problem	assertion=present	cui=C2939420	ne=metastatic disease
+                #
+                if not line.startswith('NamedEntity'):
+                    continue
+                fields = line.split()
+                if not fields[3].startswith(
+                        'semantic=') or not fields[4].startswith('assertion='):
+                    logger.warning(
+                        f'Output file {output_file} has unrecognizable NamedEntity {line}'
+                    )
+                    continue
+                val = fields[3][9:] + '=' + fields[4][10:]
+                if val in semantics:
+                    res[row[id_field]][val] += 1
+                else:
+                    logger.info(f'{output_file}: Ignore semantic {val}')
+    return res
+
 
 def write_records(output_file, records, same_file, id_field):
     if same_file:
