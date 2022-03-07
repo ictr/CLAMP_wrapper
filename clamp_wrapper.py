@@ -120,8 +120,8 @@ def get_record(source_data, range, search, reg_search, is_empty, limit,
     return data
 
 def execute_process(data, field, clamp_jar_file, clamp_license_file,
-                 clamp_pipeline, umls_api_key,
-                 umls_index_dir, semantics, id_field, input_dir, output_dir):
+        clamp_pipeline, umls_api_key,                       
+        umls_index_dir, semantics, id_field, input_dir, output_dir):
         # write new files over
         for _, row in data.iterrows():
             input_file = os.path.join(input_dir, f"data_{row[id_field]}.txt")
@@ -130,6 +130,10 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
                 ifile.write(row[field])
         #
         # CLAMP command
+        if not semantics:
+                raise ValueError(
+                'Please specify at least one semantics in the format of SEMANTIC=ASSERTION using parameter --semantics'
+            )
         if not umls_api_key:
             raise ValueError(
                 'Please specify your UMLS api key with option --umls-api-key')
@@ -195,11 +199,7 @@ def process_data(data, field, clamp_jar_file, clamp_license_file,
                 return execute_process(data, field, clamp_jar_file, clamp_license_file,
                         clamp_pipeline, umls_api_key,
                         umls_index_dir, semantics, id_field, input_dir, output_dir)
-    if clamp_project_dir:
-        if not semantics:
-                raise ValueError(
-                'Please specify at least one semantics in the format of SEMANTIC=ASSERTION using parameter --semantics'
-            )
+    else:
         input_dir = os.path.join(
             os.path.expanduser(clamp_project_dir), 'Data', 'Input')
         output_dir = os.path.join(
@@ -219,11 +219,13 @@ def process_data(data, field, clamp_jar_file, clamp_license_file,
         # clear data
         for file in os.scandir(input_dir):
             os.remove(file.path)
-        for file in os.scandir(output_dir):
-            os.remove(file.path)
-            return execute_process(data, field, clamp_jar_file, clamp_license_file,
+            os.remove(str(file).endswith(".xlsx"))
+
+        return execute_process(data, field, clamp_jar_file, clamp_license_file,
                     clamp_pipeline, umls_api_key,
                     umls_index_dir, semantics, id_field, input_dir, output_dir)
+
+    return None
 
 def write_records(output_file, records, same_file, id_field):
     if same_file:
