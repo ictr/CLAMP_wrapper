@@ -47,7 +47,7 @@ def get_record(source_data, range, search, reg_search, is_empty, limit,
         else:
             values = data[id_field].str.extract(
                 '(\d+)', expand=False).astype(int)
-            data[(values >= range[0]) & (values <= range[1])]
+            data = data[(values >= range[0]) & (values <= range[1])]
         logger.info(
             f'{data.shape[0]} records kept after restricting data from row {range[0]} to {range[1]}.'
         )
