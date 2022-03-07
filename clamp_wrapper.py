@@ -219,13 +219,13 @@ def process_data(data, field, clamp_jar_file, clamp_license_file,
         # clear data
         for file in os.scandir(input_dir):
             os.remove(file.path)
-            os.remove(str(file).endswith(".xlsx"))
+
+        for file in os.scan(output_dir):
+            os.remove(output_dir)
 
         return execute_process(data, field, clamp_jar_file, clamp_license_file,
-                    clamp_pipeline, umls_api_key,
-                    umls_index_dir, semantics, id_field, input_dir, output_dir)
-
-    return None
+                clamp_pipeline, umls_api_key,
+                umls_index_dir, semantics, id_field, input_dir, output_dir)
 
 def write_records(output_file, records, same_file, id_field):
     if same_file:
