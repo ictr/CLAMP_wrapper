@@ -120,8 +120,8 @@ def get_record(source_data, range, search, reg_search, is_empty, limit,
     return data
 
 def execute_process(data, field, clamp_jar_file, clamp_license_file,
-        clamp_pipeline, umls_api_key,                       
-        umls_index_dir, semantics, id_field, input_dir, output_dir):
+    clamp_pipeline, umls_api_key,                       
+    umls_index_dir, semantics, id_field, input_dir, output_dir):
         # write new files over
         for _, row in data.iterrows():
             input_file = os.path.join(input_dir, f"data_{row[id_field]}.txt")
@@ -191,8 +191,8 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
         return res
 
 def process_data(data, field, clamp_jar_file, clamp_license_file,
-                 clamp_pipeline, clamp_project_dir, umls_api_key,
-                 umls_index_dir, semantics, id_field):
+                clamp_pipeline, clamp_project_dir, umls_api_key,
+                umls_index_dir, semantics, id_field):
     if not clamp_project_dir:
         with tempfile.TemporaryDirectory() as input_dir:
             with tempfile.TemporaryDirectory() as output_dir:
