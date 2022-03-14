@@ -190,9 +190,9 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
                     logger.warning(f'{output_file}: {n_semantics} semantic identified. {n_recorded} recorded, {", ".join(ignored_semantics) if ignored_semantics else "none"} ignored.')
         return res
 
-def process_data(data, field, clamp_jar_file, clamp_license_file,
-clamp_pipeline, clamp_project_dir, umls_api_key,
-umls_index_dir, semantics, id_field):
+def process_data(data, field, clamp_jar_file, clamp_license_file,   
+                clamp_pipeline, clamp_project_dir, umls_api_key,
+                umls_index_dir, semantics, id_field):
     if not clamp_project_dir:
         with tempfile.TemporaryDirectory() as input_dir:
             with tempfile.TemporaryDirectory() as output_dir:
