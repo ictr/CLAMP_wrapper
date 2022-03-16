@@ -5,10 +5,10 @@ import argparse
 import logging
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
-import shutil
 from pprint import pprint
 
 import numpy as np
@@ -17,6 +17,7 @@ import pandas as pd
 logging.basicConfig(level=logging.DEBUG)
 
 logger = logging.getLogger()
+
 
 def read_data(source, id_field):
     if not os.path.isfile(source):
@@ -120,9 +121,10 @@ def get_record(source_data, range, search, reg_search, is_empty, limit,
         logger.info(f'Limiting to first {limit} records')
     return data
 
+
 def execute_process(data, field, clamp_jar_file, clamp_license_file,
-                clamp_pipeline, umls_api_key,                       
-                umls_index_dir, semantics, id_field, input_dir, output_dir):
+                    clamp_pipeline, umls_api_key, umls_index_dir, semantics,
+                    id_field, input_dir, output_dir):
     # write new files over
     for _, row in data.iterrows():
         input_file = os.path.join(input_dir, f"data_{row[id_field]}.txt")
@@ -132,7 +134,7 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
     #
     # CLAMP command
     if not semantics:
-            raise ValueError(
+        raise ValueError(
             'Please specify at least one semantics in the format of SEMANTIC=ASSERTION using parameter --semantics'
         )
     if not umls_api_key:
@@ -150,7 +152,7 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
         clamp_jar_file, 'edu.uth.clamp.nlp.main.PipelineMain', '-i', input_dir,
         '-o', output_dir, '-p', clamp_pipeline, '-A', umls_api_key, '-I',
         umls_index_dir
-    ]   
+    ]
     #
     logging.info(" ".join(cmd))
     subprocess.call(cmd)
@@ -175,9 +177,7 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
                 fields = line.split()
                 if not fields[3].startswith(
                         'semantic=') or not fields[4].startswith('assertion='):
-                    logger.warning(
-                        f'Unrecognizable output: {line.strip()}'
-                    )
+                    logger.warning(f'Unrecognizable output: {line.strip()}')
                     continue
                 val = fields[3][9:] + '=' + fields[4][10:]
                 if val in semantics:
@@ -186,47 +186,60 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
                 else:
                     ignored_semantics.add(val)
             if n_semantics == 0:
-                logger.info(f'{output_file}: {n_semantics} semantic identified. {n_recorded} recorded, {", ".join(ignored_semantics) if ignored_semantics else "none"} ignored.')
+                logger.info(
+                    f'{output_file}: {n_semantics} semantic identified. {n_recorded} recorded, {", ".join(ignored_semantics) if ignored_semantics else "none"} ignored.'
+                )
             else:
-                logger.warning(f'{output_file}: {n_semantics} semantic identified. {n_recorded} recorded, {", ".join(ignored_semantics) if ignored_semantics else "none"} ignored.')
+                logger.warning(
+                    f'{output_file}: {n_semantics} semantic identified. {n_recorded} recorded, {", ".join(ignored_semantics) if ignored_semantics else "none"} ignored.'
+                )
     return res
 
-def process_data(data, field, clamp_jar_file, clamp_license_file,   
-                clamp_pipeline, clamp_project_dir, umls_api_key,
-                umls_index_dir, semantics, id_field):
+
+def process_data(data, field, clamp_jar_file, clamp_license_file,
+                 clamp_pipeline, clamp_project_dir, umls_api_key,
+                 umls_index_dir, semantics, id_field):
     if not clamp_project_dir:
         with tempfile.TemporaryDirectory() as input_dir:
             with tempfile.TemporaryDirectory() as output_dir:
-                return execute_process(data, field, clamp_jar_file, clamp_license_file,
-                        clamp_pipeline, umls_api_key,
-                        umls_index_dir, semantics, id_field, input_dir, output_dir)
-    else:
-        input_dir = os.path.join(
-            os.path.expanduser(clamp_project_dir), 'Data', 'Input')
+                return execute_process(data, field, clamp_jar_file,
+                                       clamp_license_file, clamp_pipeline,
+                                       umls_api_key, umls_index_dir, semantics,
+                                       id_field, input_dir, output_dir)
+
+    input_dir = os.path.join(
+        os.path.expanduser(clamp_project_dir), 'Data', 'Input')
+    output_dir = os.path.join(
+        os.path.expanduser(clamp_project_dir), 'Data', 'Output')
+    if not os.path.isdir(input_dir) or not os.path.isdir(output_dir):
+        input_dir = os.path.join(os.path.expanduser(clamp_project_dir), 'input')
+        if not os.path.isdir(input_dir):
+            raise RuntimeError(
+                f'Input directory Data/Input or input does not exist under {clamp_project_dir}.'
+            )
         output_dir = os.path.join(
-            os.path.expanduser(clamp_project_dir), 'Data', 'Output')
-        if not os.path.isdir(input_dir) or not os.path.isdir(output_dir):
-            input_dir = os.path.join(os.path.expanduser(clamp_project_dir), 'input')
-            if not os.path.isdir(input_dir):
-                raise RuntimeError(
-                    f'Input directory Data/Input or input does not exist under {clamp_project_dir}.'
+            os.path.expanduser(clamp_project_dir), 'output')
+        if not os.path.isdir(output_dir):
+            raise RuntimeError(
+                f'Output directory Data/Output or output does not exist under {clamp_project_dir}.'
             )
-            output_dir = os.path.join(
-                os.path.expanduser(clamp_project_dir), 'output')
-            if not os.path.isdir(output_dir):
-                raise RuntimeError(
-                    f'Output directory Data/Output or output does not exist under {clamp_project_dir}.'
-            )
-        # clear data
-        for file in os.scandir(input_dir):
+    # clear data
+    for file in os.scandir(input_dir):
+        try:
             os.remove(file.path)
+        except Exception:
+            pass
 
-        for file in os.scan(output_dir):
-            os.remove(output_dir)
+    for file in os.scandir(output_dir):
+        try:
+            os.remove(file.path)
+        except Exception:
+            pass
 
-        return execute_process(data, field, clamp_jar_file, clamp_license_file,
-                clamp_pipeline, umls_api_key,
-                umls_index_dir, semantics, id_field, input_dir, output_dir)
+    return execute_process(data, field, clamp_jar_file, clamp_license_file,
+                           clamp_pipeline, umls_api_key, umls_index_dir,
+                           semantics, id_field, input_dir, output_dir)
+
 
 def write_records(output_file, records, same_file, id_field):
     if same_file:
@@ -314,7 +327,7 @@ command can be used as follows:
 
     * Search fields that contains breast and cancer, or colon and cancer.
         clamp_wrapper.py --input-file input.xlsx --search breast cancer --search colon cancer
-    
+
     * Search for records that have not been processed
         clamp_wrapper.py --input-file input.xlsx --is-empty 'problem=negated'
 
@@ -438,9 +451,9 @@ The command can be simplied to
     )
     parser.add_argument(
         '--clamp-project-dir',
-        help='''(Default to current directory) Input folder for CLAMP directory, which should contain
+        help='''(Default to a temporary directory) Input folder for CLAMP directory, which should contain
             a directory Data/Input and a directory Data/Output, or a directory input and a directory
-            output.''')
+            output. If unspecified, a tempoary directory will be used, and removed after the data is processed.''')
     parser.add_argument(
         '--umls-api-key',
         default='e0534990-f906-4120-87d3-92b4dabbc26b',
@@ -478,7 +491,9 @@ The command can be simplied to
                          args.is_empty, args.limit, args.id_field)
     if args.process_field:
         results = {}
-        chunks = [args.batch_size for x in range(records.shape[0] // args.batch_size)]
+        chunks = [
+            args.batch_size for x in range(records.shape[0] // args.batch_size)
+        ]
         for idx, chunk in enumerate(np.split(records, np.cumsum(chunks))):
             if chunk.shape[0] == 0:
                 continue
