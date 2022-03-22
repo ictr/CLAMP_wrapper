@@ -46,9 +46,9 @@ def write_data(data, output_file, index):
     if output_file.endswith('.xlsx'):
         data.to_excel(output_file, index=index)
     elif output_file.endswith('.csv'):
-        data = pd.to_csv(output_file)
+        data.to_csv(output_file)
     elif output_file.endswith('.tsv'):
-        data = pd.to_csv(output_file, sep='\t')
+        data.to_csv(output_file, sep='\t')
     else:
         raise ValueError('Output file should be in excel, csv, or tsv format.')
 
