@@ -22,17 +22,35 @@ logger = logging.getLogger()
 def read_data(source, id_field):
     if not os.path.isfile(source):
         raise ValueError(f'Input file does not exist: {source}')
-    if not source.endswith('.xlsx'):
-        raise ValueError(f'Please specify an excel file: {source}')
     #
     logger.info(f'Reading {source}')
-    data = pd.read_excel(source, engine='openpyxl')
+    if source.endswith('.xlsx'):
+        data = pd.read_excel(source, engine='openpyxl')
+    elif source.endswith('.csv'):
+        data = pd.read_csv(source)
+    elif source.endswith('.tsv'):
+        data = pd.read_csv(source, sep='\t')
+    else:
+        raise ValueError('Input file should be in excel, csv, or tsv format.')
+
     logger.info(f'{data.shape[0]} records read')
     if id_field not in data:
         raise ValueError(
             f'ID field {id_field} does not exist. Please use option --id-field to specify one'
         )
     return data
+
+
+def write_data(data, output_file, index):
+    logger.info(f'Write to {output_file}')
+    if output_file.endswith('.xlsx'):
+        data.to_excel(output_file, index=index)
+    elif output_file.endswith('.csv'):
+        data = pd.to_csv(output_file)
+    elif output_file.endswith('.tsv'):
+        data = pd.to_csv(output_file, sep='\t')
+    else:
+        raise ValueError('Output file should be in excel, csv, or tsv format.')
 
 
 def get_record(source_data, range, search, reg_search, is_empty, limit,
@@ -252,9 +270,9 @@ def write_records(output_file, records, same_file, id_field):
         logger.info(
             f'Writing {records.shape[0]} records to a new output file {output_file}'
         )
-        records.to_excel(output_file, index=False)
+        write_data(records, output_file, index=False)
     else:
-        old_data = pd.read_excel(output_file, engine='openpyxl')
+        old_data = read_data(output_file, id_field=id_field)
         logger.info(
             f'Appending or updating {records.shape[0]} records to a new output file {output_file}'
         )
@@ -263,7 +281,7 @@ def write_records(output_file, records, same_file, id_field):
         new_data = pd.concat(
             [old_data[~old_data[id_field].isin(new_ids)], records],
             axis=0).sort_values(by=id_field)
-        new_data.to_excel(output_file, index=False)
+        write_data(new_data, output_file, index=False)
 
 
 def write_results(output_file, data, results, same_file, id_field):
@@ -281,15 +299,15 @@ def write_results(output_file, data, results, same_file, id_field):
 
     if same_file:
         logger.info(f'Updating original input file {output_file}')
-        data.to_excel(output_file, index=False)
+        write_data(data, output_file, index=False)
     elif not os.path.isfile(output_file):
         logger.info(
             f'Writing {len(results)} records to a new output file {output_file}'
         )
         data = data[data[id_field].isin(results)]
-        data.to_excel(output_file, index=False)
+        write_data(data, output_file, index=False)
     else:
-        old_data = pd.read_excel(output_file, engine='openpyxl')
+        old_data = read_data(output_file, id_field=id_field)
         logger.info(
             f'Appending or updating {len(results)} records to a new output file {output_file}'
         )
@@ -299,7 +317,7 @@ def write_results(output_file, data, results, same_file, id_field):
             data[data[id_field].isin(results)]
         ],
                              axis=0).sort_values(by=id_field)
-        new_data.to_excel(output_file, index=False)
+        write_data(new_data, output_file, index=False)
 
 
 if __name__ == '__main__':
@@ -391,7 +409,7 @@ The command can be simplied to
     parser.add_argument(
         '--input-file',
         required=True,
-        help='''Path to an input file, which should be an excel file that has a numeric column
+        help='''Path to an input file, which should be an excel or CSV file that has a numeric column
             named "id" with no duplicated value.''')
     parser.add_argument(
         '--id-field',
@@ -453,7 +471,8 @@ The command can be simplied to
         '--clamp-project-dir',
         help='''(Default to a temporary directory) Input folder for CLAMP directory, which should contain
             a directory Data/Input and a directory Data/Output, or a directory input and a directory
-            output. If unspecified, a tempoary directory will be used, and removed after the data is processed.''')
+            output. If unspecified, a tempoary directory will be used, and removed after the data is processed.'''
+    )
     parser.add_argument(
         '--umls-api-key',
         default='e0534990-f906-4120-87d3-92b4dabbc26b',
@@ -479,11 +498,12 @@ The command can be simplied to
     )
     parser.add_argument(
         '--output-file',
-        help='''(Required for extract output by CLAMP or write selected samples without processing)
-            Write the results to an output file, which can be the same as the input file. If the
-            file already exists, it will be updated with the results. New rows and new columns will be
-            added to the file if needed. This option can be used to generate a subset of records if no
-            CLAMP processing parameter is specified.''')
+        help='''(Required for extract output by CLAMP or write selected samples without processing,
+            can be in excel or CSV format, determined by file extension). Write the results to an
+            output file, which can be the same as the input file. If the file already exists, it will
+            be updated with the results. New rows and new columns will be added to the file if needed.
+            This option can be used to generate a subset of records if no CLAMP processing parameter
+            is specified.''')
 
     args = parser.parse_args()
     data = read_data(args.input_file, args.id_field)
