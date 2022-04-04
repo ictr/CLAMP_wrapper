@@ -147,8 +147,12 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
     for _, row in data.iterrows():
         input_file = os.path.join(input_dir, f"data_{row[id_field]}.txt")
         logger.info(f'Exporting to {input_file}')
-        with open(input_file, 'w') as ifile:
-            ifile.write(row[field])
+        try:
+            with open(input_file, 'w') as ifile:
+                ifile.write(row[field])
+        except UnicodeEncodeError:
+            with open(input_file, 'wb') as ifile:
+                ifile.write(row[field].encode('utf8'))
     #
     # CLAMP command
     if not semantics:
