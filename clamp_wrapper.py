@@ -297,14 +297,14 @@ def write_results(output_file, data, results, same_file, id_field):
     logger.info(
         f'Updating results from {len(results)} records in {output_file}.')
 
-    for id, res in results.items():
-        idx = list(np.where(data[id_field] == id))[0]
-        for key in res.keys():
-            if key not in data:
-                logger.info(f'Adding column {key} to {output_file}')
-                data.insert(2, key, [None for x in data[id_field]])
-            #
-            data.iloc[idx, data.columns.get_loc(key)] = res[key]
+    for key in res.keys():
+        if key not in data:
+            logger.info(f'Adding column {key} to {output_file}')
+            data.insert(2, key, [None for x in data[id_field]])
+        col_idx = data.columns.get_loc(key)
+        row_map = {v:k for k,v in data[id_field].to_dict().items()}
+        for id, res in results.items():
+            data.iloc[row_map[id], col_idx] = res[key]
 
     if same_file:
         logger.info(f'Updating original input file {output_file}')
