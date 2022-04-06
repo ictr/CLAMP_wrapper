@@ -538,8 +538,9 @@ The command can be simplied to
             if args.not_in_output not in out_data:
                 raise ValueError(f'Field {args.not_in_output} does not exist in output file.')
             exclude_ids = out_data[out_data[args.not_in_output].notnull()][args.id_field]
-            print(f'Excluding {len(exclude_ids)}' records in output file')
+            orig_rows = records.shape[0]
             records = records[~records[args.id_field].isin(exclude_ids)]
+            print(f'Excluding {records.shape[0] - orig_rows} records from {len(exclude_ids)} records in output file. {records.shape[0]} remains.')
         else:
             print('Output file does not exist to exclude records for parameter --not-in-output.')
     if args.process_field:
