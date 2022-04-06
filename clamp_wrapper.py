@@ -297,14 +297,14 @@ def write_results(output_file, data, results, same_file, id_field):
     logger.info(
         f'Updating results from {len(results)} records in {output_file}.')
 
-    row_map = {v:k for k,v in data[id_field].to_dict().items()}
-    col_map = {v:i for i,v in enumerate(data.columns)}
+    row_map = {v: i for i, v in enumerate(data[id_field])}
+    col_map = {v: i for i, v in enumerate(data.columns)}
     for id, res in results.items():
         for key in res.keys():
             if key not in data:
                 logger.info(f'Adding column {key} to {output_file}')
                 data.insert(2, key, [None for x in data[id_field]])
-                col_map = {v:i for i,v in enumerate(data.columns)}
+                col_map = {v: i for i, v in enumerate(data.columns)}
             data.iloc[row_map[id], col_map[key]] = res[key]
 
     if same_file:
@@ -502,8 +502,7 @@ The command can be simplied to
         '--dryrun',
         action='store_true',
         help='''If present, do not actually process data. The wrapper will read data, create fake result,
-             and write output.'''
-    )
+             and write output.''')
     parser.add_argument(
         '--semantics',
         nargs='*',
@@ -538,19 +537,18 @@ The command can be simplied to
             logger.info(
                 f'Processing {chunk.shape[0]} records in batch {idx + 1} ({start} - {end}) of {records.shape[0]} records.'
             )
-            results.update(
-                process_data(
-                    chunk,
-                    args.process_field,
-                    args.clamp_jar_file,
-                    args.clamp_license_file,
-                    args.clamp_pipeline,
-                    args.clamp_project_dir,
-                    args.umls_api_key,
-                    args.umls_index_dir,
-                    args.semantics,
-                    id_field=args.id_field,
-                    dryrun=args.dryrun))
+            results = process_data(
+                chunk,
+                args.process_field,
+                args.clamp_jar_file,
+                args.clamp_license_file,
+                args.clamp_pipeline,
+                args.clamp_project_dir,
+                args.umls_api_key,
+                args.umls_index_dir,
+                args.semantics,
+                id_field=args.id_field,
+                dryrun=args.dryrun)
             if args.output_file:
                 write_results(
                     args.output_file,
