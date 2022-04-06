@@ -142,9 +142,11 @@ def get_record(source_data, range, search, reg_search, is_empty, limit,
 
 def execute_process(data, field, clamp_jar_file, clamp_license_file,
                     clamp_pipeline, umls_api_key, umls_index_dir, semantics,
-                    id_field, input_dir, output_dir):
+                    id_field, input_dir, output_dir, dryrun):
     # write new files over
     for _, row in data.iterrows():
+        if dryrun:
+            continue
         input_file = os.path.join(input_dir, f"data_{row[id_field]}.txt")
         logger.info(f'Exporting to {input_file}')
         try:
@@ -176,15 +178,18 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
         umls_index_dir
     ]
     #
-    logging.info(" ".join(cmd))
-    subprocess.call(cmd)
+    if not dryrun:
+        logging.info(" ".join(cmd))
+        subprocess.call(cmd)
     res = {}
     for _, row in data.iterrows():
+        # process output file
+        res[row[id_field]] = {x: 0 for x in semantics}
+        if dryrun:
+            continue
         output_file = os.path.join(output_dir, f"data_{row[id_field]}.txt")
         if not os.path.exists(output_file):
             raise RuntimeError(f'Failed to locate output file {output_file}')
-        # process output file
-        res[row[id_field]] = {x: 0 for x in semantics}
         with open(output_file) as ofile:
             n_semantics = 0
             n_recorded = 0
@@ -220,14 +225,14 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
 
 def process_data(data, field, clamp_jar_file, clamp_license_file,
                  clamp_pipeline, clamp_project_dir, umls_api_key,
-                 umls_index_dir, semantics, id_field):
+                 umls_index_dir, semantics, id_field, dryrun):
     if not clamp_project_dir:
         with tempfile.TemporaryDirectory() as input_dir:
             with tempfile.TemporaryDirectory() as output_dir:
                 return execute_process(data, field, clamp_jar_file,
                                        clamp_license_file, clamp_pipeline,
                                        umls_api_key, umls_index_dir, semantics,
-                                       id_field, input_dir, output_dir)
+                                       id_field, input_dir, output_dir, dryrun)
 
     input_dir = os.path.join(
         os.path.expanduser(clamp_project_dir), 'Data', 'Input')
@@ -260,7 +265,7 @@ def process_data(data, field, clamp_jar_file, clamp_license_file,
 
     return execute_process(data, field, clamp_jar_file, clamp_license_file,
                            clamp_pipeline, umls_api_key, umls_index_dir,
-                           semantics, id_field, input_dir, output_dir)
+                           semantics, id_field, input_dir, output_dir, dryrun)
 
 
 def write_records(output_file, records, same_file, id_field):
@@ -493,6 +498,12 @@ The command can be simplied to
         help='''(Default to 10000). Number of records to be processed by CLAMP each time.'''
     )
     parser.add_argument(
+        '--dryrun',
+        action='store_true',
+        help='''If present, do not actually process data. The wrapper will read data, create fake result,
+             and write output.'''
+    )
+    parser.add_argument(
         '--semantics',
         nargs='*',
         help='''(One or more values required for parsing output files) One or more values in the format
@@ -537,7 +548,8 @@ The command can be simplied to
                     args.umls_api_key,
                     args.umls_index_dir,
                     args.semantics,
-                    id_field=args.id_field))
+                    id_field=args.id_field,
+                    args.dryrun))
             if args.output_file:
                 write_results(
                     args.output_file,
