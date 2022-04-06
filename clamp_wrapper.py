@@ -456,6 +456,12 @@ The command can be simplied to
         help='''(Optional record filtering) Find records that is empty for specified column'''
     )
     parser.add_argument(
+        '--not-in-output',
+        help='''(Optional record filtering) Exclude records that is already in the output file,
+            which accepts name of the field that is indicative of "processed"
+            (usually semantices)'''
+    )
+    parser.add_argument(
         '--limit',
         type=int,
         help='''(Optional record filtering) The maximum number of records to process.'''
@@ -524,6 +530,18 @@ The command can be simplied to
     data = read_data(args.input_file, args.id_field)
     records = get_record(data, args.range, args.search, args.reg_search,
                          args.is_empty, args.limit, args.id_field)
+    if args.not_in_output:
+        if not args.output_file:
+            raise ValueError(f'--output-file is needed for parameter --no-in-output')
+        if os.path.isfile(args.output_file):
+            out_data = read_data(args.output_file, args.id_field)
+            if args.not_in_output not in out_data:
+                raise ValueError(f'Field {args.not_in_output} does not exist in output file.')
+            exclude_ids = out_data[out_data[args.not_in_output].notnull()][args.id_field]
+            print(f'Excluding {len(exclude_ids)}' records in output file')
+            records = records[~records[args.id_field].isin(exclude_ids)]
+        else:
+            print('Output file does not exist to exclude records for parameter --not-in-output.')
     if args.process_field:
         results = {}
         chunks = [
