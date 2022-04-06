@@ -549,7 +549,7 @@ The command can be simplied to
                     args.umls_index_dir,
                     args.semantics,
                     id_field=args.id_field,
-                    args.dryrun))
+                    dryrun=args.dryrun))
             if args.output_file:
                 write_results(
                     args.output_file,
