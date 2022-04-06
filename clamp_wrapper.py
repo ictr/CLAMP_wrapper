@@ -41,8 +41,12 @@ def read_data(source, id_field):
     return data
 
 
-def write_data(data, output_file, index):
-    logger.info(f'Write to {output_file}')
+def write_data(data, output_file, index, dryrun):
+    if dryrun:
+        logger.info(f'Write to {output_file} (not written due to dryrun mode)')
+        return
+    else:
+        logger.info(f'Write to {output_file}')
     if output_file.endswith('.xlsx'):
         data.to_excel(output_file, index=index)
     elif output_file.endswith('.csv'):
@@ -184,9 +188,10 @@ def execute_process(data, field, clamp_jar_file, clamp_license_file,
     res = {}
     for _, row in data.iterrows():
         # process output file
-        res[row[id_field]] = {x: 0 for x in semantics}
         if dryrun:
+            res[row[id_field]] = {}
             continue
+        res[row[id_field]] = {x: 0 for x in semantics}
         output_file = os.path.join(output_dir, f"data_{row[id_field]}.txt")
         if not os.path.exists(output_file):
             raise RuntimeError(f'Failed to locate output file {output_file}')
@@ -268,7 +273,7 @@ def process_data(data, field, clamp_jar_file, clamp_license_file,
                            semantics, id_field, input_dir, output_dir, dryrun)
 
 
-def write_records(output_file, records, same_file, id_field):
+def write_records(output_file, records, same_file, id_field, dryrun):
     if same_file:
         logger.info(f'No need to update the existing file with no result.')
         return
@@ -279,7 +284,7 @@ def write_records(output_file, records, same_file, id_field):
         logger.info(
             f'Writing {records.shape[0]} records to a new output file {output_file}'
         )
-        write_data(records, output_file, index=False)
+        write_data(records, output_file, index=False, dryrun=dryrun)
     else:
         old_data = read_data(output_file, id_field=id_field)
         logger.info(
@@ -290,10 +295,10 @@ def write_records(output_file, records, same_file, id_field):
         new_data = pd.concat(
             [old_data[~old_data[id_field].isin(new_ids)], records],
             axis=0).sort_values(by=id_field)
-        write_data(new_data, output_file, index=False)
+        write_data(new_data, output_file, index=False, dryrun=dryrun)
 
 
-def write_results(output_file, data, results, same_file, id_field):
+def write_results(output_file, data, results, same_file, id_field, dryrun):
     logger.info(
         f'Updating results from {len(results)} records in {output_file}.')
 
@@ -309,13 +314,13 @@ def write_results(output_file, data, results, same_file, id_field):
 
     if same_file:
         logger.info(f'Updating original input file {output_file}')
-        write_data(data, output_file, index=False)
+        write_data(data, output_file, index=False, dryrun=dryrun)
     elif not os.path.isfile(output_file):
         logger.info(
             f'Writing {len(results)} records to a new output file {output_file}'
         )
         data = data[data[id_field].isin(results)]
-        write_data(data, output_file, index=False)
+        write_data(data, output_file, index=False, dryrun=dryrun)
     else:
         old_data = read_data(output_file, id_field=id_field)
         logger.info(
@@ -327,7 +332,7 @@ def write_results(output_file, data, results, same_file, id_field):
             data[data[id_field].isin(results)]
         ],
                              axis=0).sort_values(by=id_field)
-        write_data(new_data, output_file, index=False)
+        write_data(new_data, output_file, index=False, dryrun=dryrun)
 
 
 if __name__ == '__main__':
@@ -459,8 +464,7 @@ The command can be simplied to
         '--not-in-output',
         help='''(Optional record filtering) Exclude records that is already in the output file,
             which accepts name of the field that is indicative of "processed"
-            (usually semantices)'''
-    )
+            (usually semantices)''')
     parser.add_argument(
         '--limit',
         type=int,
@@ -532,17 +536,25 @@ The command can be simplied to
                          args.is_empty, args.limit, args.id_field)
     if args.not_in_output:
         if not args.output_file:
-            raise ValueError(f'--output-file is needed for parameter --no-in-output')
+            raise ValueError(
+                f'--output-file is needed for parameter --no-in-output')
         if os.path.isfile(args.output_file):
             out_data = read_data(args.output_file, args.id_field)
             if args.not_in_output not in out_data:
-                raise ValueError(f'Field {args.not_in_output} does not exist in output file.')
-            exclude_ids = out_data[out_data[args.not_in_output].notnull()][args.id_field]
+                raise ValueError(
+                    f'Field {args.not_in_output} does not exist in output file.'
+                )
+            exclude_ids = out_data[out_data[args.not_in_output].notnull()][
+                args.id_field]
             orig_rows = records.shape[0]
             records = records[~records[args.id_field].isin(exclude_ids)]
-            print(f'Excluding {records.shape[0] - orig_rows} records from {len(exclude_ids)} records in output file. {records.shape[0]} remains.')
+            print(
+                f'Exclude {orig_rows - records.shape[0]} records that are already in {len(exclude_ids)} records in output file. {records.shape[0]} remains.'
+            )
         else:
-            print('Output file does not exist to exclude records for parameter --not-in-output.')
+            print(
+                'Output file does not exist to exclude records for parameter --not-in-output.'
+            )
     if args.process_field:
         results = {}
         chunks = [
@@ -574,7 +586,8 @@ The command can be simplied to
                     data,
                     results,
                     same_file=args.input_file == args.output_file,
-                    id_field=args.id_field)
+                    id_field=args.id_field,
+                    dryrun=args.dryrun)
 
         if not args.output_file:
             for id, res in results.items():
@@ -592,7 +605,8 @@ The command can be simplied to
                 args.output_file,
                 records,
                 same_file=args.input_file == args.output_file,
-                id_field=args.id_field)
+                id_field=args.id_field,
+                dryrun=args.dryrun)
         else:
             for _, rec in records.iterrows():
                 pprint(rec.to_dict())
@@ -600,4 +614,4 @@ The command can be simplied to
             logging.info(
                 f"{records.shape[0]} records outputted. Use option '--process-fields' to process the data"
             )
-    logger.info(f'Done')
+    logger.info('Done (dryrun mode)' if args.dryrun else 'Done')
